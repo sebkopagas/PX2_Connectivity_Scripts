@@ -1,9 +1,22 @@
-Explanation:
-Step Keywords: The steps_keywords dictionary defines keywords that correspond to each step. The regular expressions look for relevant patterns in the log entries.
-Timestamp Extraction: The regex pattern \[\d{2}:\d{2}:\d{2}\.\d{3}\] captures timestamps of the format [HH:MM:SS.SSS].
-Log Parsing: The script reads through each line in the log file and checks if it matches any of the predefined keywords for the 10 steps. If a match is found, it records the timestamp.
-Output: The script outputs a dictionary with the step names and corresponding timestamps. This is converted into a pandas DataFrame for easy viewing and saving.
+# Log Analysis Script
 
-How to Use:
-Replace /path/to/your/logfile.txt with the path to your log file.
-You can run this script in any Python environment. It will print the extracted timestamps and save them to a CSV file if required.
+This Python script processes log files, extracts timestamps for specific events, calculates the time elapsed since the first event, and generates a plot showing the event timeline. It also outputs the results to a CSV file, making it easy to analyze in Excel or other tools.
+
+## Features
+
+- **Friendly Time Output**: Extracts timestamps in an `HH:MM:SS` format, which is suitable for Excel.
+- **Elapsed Time Calculation**: Adds a column in the output CSV showing the time elapsed (in seconds) since the first event.
+- **Event Timeline Plot**: Generates a scatter plot showing the event timeline as a function of time and saves it as a PNG file.
+- **CSV Output**: Exports the extracted timestamps and elapsed time into a CSV file, with additional header information such as `g_meterId`, `modemIMEI`, and more.
+
+## Prerequisites
+
+- Python 3.x
+- The following Python packages:
+  - `pandas`
+  - `matplotlib`
+
+You can install the required packages using pip:
+
+```bash
+pip install pandas matplotlib
