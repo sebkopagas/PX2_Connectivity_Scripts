@@ -1,0 +1,9 @@
+Explanation:
+Step Keywords: The steps_keywords dictionary defines keywords that correspond to each step. The regular expressions look for relevant patterns in the log entries.
+Timestamp Extraction: The regex pattern \[\d{2}:\d{2}:\d{2}\.\d{3}\] captures timestamps of the format [HH:MM:SS.SSS].
+Log Parsing: The script reads through each line in the log file and checks if it matches any of the predefined keywords for the 10 steps. If a match is found, it records the timestamp.
+Output: The script outputs a dictionary with the step names and corresponding timestamps. This is converted into a pandas DataFrame for easy viewing and saving.
+
+How to Use:
+Replace /path/to/your/logfile.txt with the path to your log file.
+You can run this script in any Python environment. It will print the extracted timestamps and save them to a CSV file if required.
