@@ -86,35 +86,10 @@ def extract_timestamps(log_file_path):
     # Return the extracted information
     return header_info, timestamps, time_list
 
-# Function to handle multiple files in a directory
-def process_directory(directory_path):
-    all_timestamps = []
-    
-    # Process all .txt files in the directory
-    for filename in os.listdir(directory_path):
-        if filename.endswith(".txt"):
-            log_file_path = os.path.join(directory_path, filename)
-            print(f"Processing file: {log_file_path}")
-            header_info, timestamps, time_list = extract_timestamps(log_file_path)
-            
-            if timestamps:
-                # Add the filename as a new column to track which file the data came from
-                for step, ts_list in timestamps.items():
-                    for timestamp in ts_list:
-                        all_timestamps.append((filename, step, timestamp))
-    
-    return all_timestamps
-
-# Function to suggest output file path based on log file path and iccid number
-def suggest_output_file_path(log_file_path, iccid):
-    log_directory = os.path.dirname(log_file_path)
-    output_filename = f"{iccid}.csv" if iccid else "output.csv"
-    return os.path.join(log_directory, output_filename)
-
-# Function to calculate elapsed time
-def calculate_elapsed_time(time_list):
-    first_time = time_list[0]
-    elapsed_times = [(t - first_time).total_seconds() for t in time_list]
+# Function to calculate elapsed time based on timestamps in DataFrame
+def calculate_elapsed_time(df):
+    first_time = pd.Timestamp(df['Timestamp'].iloc[0])  # Get the first timestamp from the DataFrame
+    elapsed_times = [(pd.Timestamp(t) - first_time).total_seconds() for t in df['Timestamp']]
     return elapsed_times
 
 # Function to plot the timestamps
@@ -136,62 +111,46 @@ def create_plot(timestamps, output_file):
     plt.show()
     print(f"Plot saved to {plot_file}")
 
-# Prompt the user for the log file path or directory
-log_file_path = input("Please enter the full path to your log file or directory: ")
+# Prompt the user for the log file path
+log_file_path = input("Please enter the full path to your log file: ")
 
-if os.path.isdir(log_file_path):
-    # Process the directory
-    all_timestamps = process_directory(log_file_path)
-    if all_timestamps:
-        # Convert to DataFrame
-        timestamps_df = pd.DataFrame(all_timestamps, columns=['File', 'Event', 'Timestamp'])
-        print("\nExtracted Timestamps from Directory:")
-        print(timestamps_df)
+# Process the log file
+header_info, timestamps, time_list = extract_timestamps(log_file_path)
+if timestamps:
+    # Prepare DataFrame with multiple entries for each step
+    data = [(step, timestamp.strftime("%H:%M:%S")) for step, ts_list in timestamps.items() for timestamp in ts_list]
+    timestamps_df = pd.DataFrame(data, columns=['Event', 'Timestamp'])
+
+    # Calculate elapsed time
+    elapsed_times = calculate_elapsed_time(timestamps_df)
+    timestamps_df['Elapsed Time (s)'] = elapsed_times
+
+    # Display extracted timestamps
+    print("\nExtracted Timestamps:")
+    print(timestamps_df)
+
+    # Suggest output file path
+    suggested_output_file = f"{log_file_path}_output.csv"
+    print(f"Suggested output file path: {suggested_output_file}")
+
+    # Optionally save the results to a CSV file with headers
+    save_to_csv = input("\nDo you want to save the extracted timestamps to a CSV file? (yes/no): ").strip().lower()
+    if save_to_csv == 'yes':
+        output_file = input(f"Enter the full path and filename for the output CSV (press Enter to use suggested: {suggested_output_file}): ").strip() or suggested_output_file
         
-        # Optionally save the results to a CSV file
-        save_to_csv = input("\nDo you want to save the extracted timestamps to a CSV file? (yes/no): ").strip().lower()
-        if save_to_csv == 'yes':
-            output_file = input("Enter the full path and filename for the output CSV (e.g., /path/to/output.csv): ")
-            timestamps_df.to_csv(output_file, index=False)
-            print(f"Timestamps saved to {output_file}")
-else:
-    # Process a single file
-    header_info, timestamps, time_list = extract_timestamps(log_file_path)
-    if timestamps:
-        # Prepare DataFrame with multiple entries for each step (if applicable)
-        data = [(step, timestamp.strftime("%H:%M:%S")) for step, ts_list in timestamps.items() for timestamp in ts_list]
-        timestamps_df = pd.DataFrame(data, columns=['Event', 'Timestamp'])
+        # Write to CSV with headers
+        with open(output_file, 'w') as f:
+            # Write the header info at the top of the CSV file
+            f.write("Header Information:\n")
+            for key, value in header_info.items():
+                f.write(f"{key}: {value}\n")
+            f.write("\n")
 
-        # Calculate elapsed time
-        elapsed_times = calculate_elapsed_time(time_list)
-        timestamps_df['Elapsed Time (s)'] = elapsed_times
+        # Append the timestamps DataFrame to the CSV
+        timestamps_df.to_csv(output_file, mode='a', index=False)
+        print(f"Timestamps saved to {output_file}")
 
-        # Display extracted timestamps
-        print("\nExtracted Timestamps:")
-        print(timestamps_df)
-
-        # Suggest output file path based on ICCID
-        suggested_output_file = suggest_output_file_path(log_file_path, header_info.get("g_stIccid.iccid_nu"))
-        print(f"Suggested output file path: {suggested_output_file}")
-
-        # Optionally save the results to a CSV file with headers
-        save_to_csv = input("\nDo you want to save the extracted timestamps to a CSV file? (yes/no): ").strip().lower()
-        if save_to_csv == 'yes':
-            output_file = input(f"Enter the full path and filename for the output CSV (press Enter to use suggested: {suggested_output_file}): ").strip() or suggested_output_file
-            
-            # Write to CSV with headers
-            with open(output_file, 'w') as f:
-                # Write the header info at the top of the CSV file
-                f.write("Header Information:\n")
-                for key, value in header_info.items():
-                    f.write(f"{key}: {value}\n")
-                f.write("\n")
-
-            # Append the timestamps DataFrame to the CSV
-            timestamps_df.to_csv(output_file, mode='a', index=False)
-            print(f"Timestamps saved to {output_file}")
-
-            # Create and save the plot
-            create_plot(timestamps, output_file)
-        else:
-            print("Timestamps not saved.")
+        # Create and save the plot
+        create_plot(timestamps, output_file)
+    else:
+        print("Timestamps not saved.")
