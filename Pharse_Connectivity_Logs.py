@@ -1,6 +1,8 @@
 import os
 import re
 import pandas as pd
+from datetime import datetime
+import matplotlib.pyplot as plt
 
 # Function to extract specific variables from the log file for the header
 def extract_header_info(log_content):
@@ -54,7 +56,7 @@ def extract_timestamps(log_file_path):
             log_content = file.readlines()
     except FileNotFoundError:
         print(f"Error: The file '{log_file_path}' was not found. Please check the file path and try again.")
-        return None, None
+        return None, None, None
 
     # Extract the header information
     header_info = extract_header_info(log_content)
@@ -64,12 +66,16 @@ def extract_timestamps(log_file_path):
 
     # Dictionary to store the extracted timestamps (as lists to capture multiple matches per step)
     timestamps = {step: [] for step in steps_keywords}
+    time_list = []
 
     # Iterate through log file and find matching entries
     for line in log_content:
         timestamp_match = timestamp_pattern.search(line)
         if timestamp_match:
-            timestamp = timestamp_match.group(0)
+            timestamp_str = timestamp_match.group(0)
+            # Convert to datetime object with milliseconds for time calculation
+            timestamp = datetime.strptime(timestamp_str[1:-1], "%H:%M:%S.%f")  # Include milliseconds parsing
+            time_list.append(timestamp)
             for step, keywords in steps_keywords.items():
                 # Check each keyword for the current step
                 for keyword in keywords:
@@ -77,7 +83,8 @@ def extract_timestamps(log_file_path):
                         timestamps[step].append(timestamp)
                         break  # Move to the next step once a keyword is found
 
-    return header_info, timestamps
+    # Return the extracted information
+    return header_info, timestamps, time_list
 
 # Function to handle multiple files in a directory
 def process_directory(directory_path):
@@ -88,7 +95,7 @@ def process_directory(directory_path):
         if filename.endswith(".txt"):
             log_file_path = os.path.join(directory_path, filename)
             print(f"Processing file: {log_file_path}")
-            header_info, timestamps = extract_timestamps(log_file_path)
+            header_info, timestamps, time_list = extract_timestamps(log_file_path)
             
             if timestamps:
                 # Add the filename as a new column to track which file the data came from
@@ -103,6 +110,31 @@ def suggest_output_file_path(log_file_path, iccid):
     log_directory = os.path.dirname(log_file_path)
     output_filename = f"{iccid}.csv" if iccid else "output.csv"
     return os.path.join(log_directory, output_filename)
+
+# Function to calculate elapsed time
+def calculate_elapsed_time(time_list):
+    first_time = time_list[0]
+    elapsed_times = [(t - first_time).total_seconds() for t in time_list]
+    return elapsed_times
+
+# Function to plot the timestamps
+def create_plot(timestamps, output_file):
+    plt.figure(figsize=(10, 6))
+    
+    for event, times in timestamps.items():
+        plt.plot(times, [event] * len(times), 'o', label=event)
+    
+    plt.xlabel("Time")
+    plt.ylabel("Event")
+    plt.title("Event Timeline")
+    plt.grid(True)
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    
+    plot_file = output_file.replace(".csv", ".png")
+    plt.savefig(plot_file)
+    plt.show()
+    print(f"Plot saved to {plot_file}")
 
 # Prompt the user for the log file path or directory
 log_file_path = input("Please enter the full path to your log file or directory: ")
@@ -122,15 +154,17 @@ if os.path.isdir(log_file_path):
             output_file = input("Enter the full path and filename for the output CSV (e.g., /path/to/output.csv): ")
             timestamps_df.to_csv(output_file, index=False)
             print(f"Timestamps saved to {output_file}")
-        else:
-            print("Timestamps not saved.")
 else:
     # Process a single file
-    header_info, timestamps = extract_timestamps(log_file_path)
+    header_info, timestamps, time_list = extract_timestamps(log_file_path)
     if timestamps:
         # Prepare DataFrame with multiple entries for each step (if applicable)
-        data = [(step, timestamp) for step, ts_list in timestamps.items() for timestamp in ts_list]
+        data = [(step, timestamp.strftime("%H:%M:%S")) for step, ts_list in timestamps.items() for timestamp in ts_list]
         timestamps_df = pd.DataFrame(data, columns=['Event', 'Timestamp'])
+
+        # Calculate elapsed time
+        elapsed_times = calculate_elapsed_time(time_list)
+        timestamps_df['Elapsed Time (s)'] = elapsed_times
 
         # Display extracted timestamps
         print("\nExtracted Timestamps:")
@@ -156,5 +190,8 @@ else:
             # Append the timestamps DataFrame to the CSV
             timestamps_df.to_csv(output_file, mode='a', index=False)
             print(f"Timestamps saved to {output_file}")
+
+            # Create and save the plot
+            create_plot(timestamps, output_file)
         else:
             print("Timestamps not saved.")
